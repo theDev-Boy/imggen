@@ -16,7 +16,7 @@ from PIL import Image, ImageEnhance
 # OpenRouter API Config
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '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')
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL_NAME = "baidu/cobuddy:free"
+MODEL_NAME = "inclusionai/ring-2.6-1t:free"
 
 def enhance_prompt_with_ai(user_prompt):
     """Use OpenRouter to create better image prompts"""
