@@ -1,4 +1,4 @@
-name: 🎨 AI Image Generator
+name: 🎨 AI Image Generator with Smart Prompts
 
 on:
   workflow_dispatch:
@@ -13,7 +13,7 @@ on:
       prompt1:
         description: '📝 Prompt for Image 1'
         required: true
-        default: 'a boy skydiving from airplane, photorealistic, detailed, cinematic'
+        default: 'a boy jumping from airplane'
         type: string
       
       prompt2:
@@ -53,7 +53,7 @@ on:
 jobs:
   generate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     
     steps:
       - name: Checkout
@@ -70,23 +70,32 @@ jobs:
           path: |
             ~/.cache/pip
             ~/.cache/huggingface
-          key: fast-model-v2-${{ runner.os }}
+          key: smart-gen-v1-${{ runner.os }}
       
       - name: Install Dependencies
         run: |
-          pip install --upgrade pip setuptools wheel
+          pip install --upgrade pip
           pip install torch --index-url https://download.pytorch.org/whl/cpu
-          pip install diffusers transformers accelerate safetensors pillow
+          pip install diffusers transformers accelerate safetensors pillow requests
       
       - name: Generate Images
         env:
-          HF_HUB_DISABLE_PROGRESS_BARS: 1
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
-          python generate.py --count ${{ github.event.inputs.count }} --steps ${{ github.event.inputs.steps }} --p1 "${{ github.event.inputs.prompt1 }}" --p2 "${{ github.event.inputs.prompt2 }}" --p3 "${{ github.event.inputs.prompt3 }}" --p4 "${{ github.event.inputs.prompt4 }}" --p5 "${{ github.event.inputs.prompt5 }}"
+          python generate.py \
+            --count ${{ github.event.inputs.count }} \
+            --steps ${{ github.event.inputs.steps }} \
+            --p1 "${{ github.event.inputs.prompt1 }}" \
+            --p2 "${{ github.event.inputs.prompt2 }}" \
+            --p3 "${{ github.event.inputs.prompt3 }}" \
+            --p4 "${{ github.event.inputs.prompt4 }}" \
+            --p5 "${{ github.event.inputs.prompt5 }}"
       
       - name: Upload Images
         uses: actions/upload-artifact@v4
         with:
           name: ai-images
-          path: output_*.png
+          path: |
+            output_*.png
+            prompts_info.txt
           retention-days: 7
