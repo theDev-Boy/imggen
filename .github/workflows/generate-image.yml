@@ -10,7 +10,7 @@ on:
         default: 'boy jumping from airplane, cinematic lighting, dramatic sky'
         type: string
       steps:
-        description: 'Number of inference steps (4-8 for LCM, higher = better but slower)'
+        description: 'Number of inference steps (4-8 for LCM)'
         required: false
         default: '4'
         type: choice
@@ -27,7 +27,7 @@ on:
 jobs:
   generate-image:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     
     steps:
       - name: 📥 Checkout Repository
@@ -38,14 +38,23 @@ jobs:
         with:
           python-version: '3.10'
       
-      - name: 📦 Cache Model Files
+      - name: 📦 Cache Python Packages
         uses: actions/cache@v4
-        id: cache-models
+        id: cache-pip
+        with:
+          path: ~/.cache/pip
+          key: pip-packages-v1-${{ runner.os }}-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            pip-packages-v1-${{ runner.os }}-
+      
+      - name: 📦 Cache HuggingFace Models
+        uses: actions/cache@v4
+        id: cache-hf
         with:
           path: ~/.cache/huggingface
-          key: lcm-sd15-model-v3
+          key: hf-models-v1-${{ hashFiles('**/generate.py') }}
           restore-keys: |
-            lcm-sd15-model-
+            hf-models-v1-
       
       - name: 📚 Install Dependencies
         run: |
@@ -58,6 +67,7 @@ jobs:
         env:
           HF_HUB_DISABLE_PROGRESS_BARS: 1
           HF_HUB_ENABLE_HF_TRANSFER: 0
+          HF_HUB_OFFLINE: ${{ steps.cache-hf.outputs.cache-hit == 'true' && '1' || '0' }}
         run: |
           python generate.py "${{ github.event.inputs.prompt }}" \
             --steps ${{ github.event.inputs.steps }} \
