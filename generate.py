@@ -1,105 +1,116 @@
 #!/usr/bin/env python3
 """
-QUALITY Image Generator - Great faces and bodies!
-Uses SDXL Turbo or Realistic Vision for humans
+FAST & QUALITY Image Generator
+Model: Realistic Vision v5.1 (2GB) - Great faces, fast!
 """
 
 import torch
 import time
 import argparse
-import os
-from diffusers import AutoPipelineForText2Image, DiffusionPipeline
-from PIL import Image
+from diffusers import DiffusionPipeline
+from PIL import Image, ImageEnhance
 
-def generate_image(prompt, style="photorealistic", num_steps=1):
-    print("🚀 QUALITY Image Generator")
-    print(f"📝 Prompt: {prompt}")
-    print(f"🎨 Style: {style}")
-    print(f"⚙️  Steps: {num_steps}")
-    
-    start = time.time()
-    
-    # Choose model based on style
-    if style == "anime":
-        model_id = "cagliostrolab/animagine-xl-3.1"
-        print("🌸 Loading Anime model...")
-    elif style == "artistic":
-        model_id = "stabilityai/sdxl-turbo"
-        print("🎨 Loading Artistic model...")
-    else:
-        # BEST FOR REALISTIC HUMANS
-        model_id = "stabilityai/sdxl-turbo"
-        print("📸 Loading Photorealistic model...")
-    
-    # Load with optimizations
-    load_start = time.time()
-    
-    try:
-        pipe = AutoPipelineForText2Image.from_pretrained(
-            model_id,
-            torch_dtype=torch.float32,
-            variant="fp16" if torch.cuda.is_available() else None,
-        )
-    except:
-        # Fallback to basic SDXL
-        pipe = DiffusionPipeline.from_pretrained(
-            "stabilityai/sdxl-turbo",
-            torch_dtype=torch.float32,
-        )
-    
-    # CPU optimizations
-    pipe.enable_attention_slicing()
-    pipe.enable_vae_slicing()
-    
-    print(f"✅ Model loaded in {time.time()-load_start:.1f}s")
+def generate_single_image(pipe, prompt, steps=8, index=1):
+    """Generate one high-quality image"""
+    print(f"\n🎨 Image {index}: {prompt}")
     
     # Enhance prompt for better humans
-    if style == "photorealistic":
-        enhanced_prompt = f"{prompt}, photorealistic, highly detailed face, detailed eyes, detailed skin texture, professional photography, 8k uhd, sharp focus, realistic human proportions"
-        negative_prompt = "cartoon, painting, blurry, distorted face, bad anatomy, extra limbs, ugly, deformed, disfigured, bad proportions, unnatural body"
-    elif style == "anime":
-        enhanced_prompt = f"{prompt}, anime style, studio ghibli, detailed, high quality"
-        negative_prompt = "photorealistic, ugly, deformed"
-    else:
-        enhanced_prompt = f"{prompt}, artistic, beautiful, detailed"
-        negative_prompt = "ugly, deformed, bad quality"
+    enhanced = f"{prompt}, photorealistic, highly detailed face, detailed skin, professional photography, 8k, sharp focus, masterpiece"
+    negative = "cartoon, painting, blurry, distorted face, bad anatomy, extra limbs, ugly, deformed, disfigured, bad hands, missing fingers, watermark, text"
     
-    print("🎨 Creating your image...")
     gen_start = time.time()
     
     with torch.no_grad():
         image = pipe(
-            prompt=enhanced_prompt,
-            negative_prompt=negative_prompt,
-            num_inference_steps=num_steps,
-            guidance_scale=0.0 if num_steps <= 2 else 1.0,
-            height=768,
-            width=768,
+            prompt=enhanced,
+            negative_prompt=negative,
+            num_inference_steps=steps,
+            guidance_scale=7.5,
+            height=512,
+            width=512,
         ).images[0]
     
-    gen_time = time.time() - gen_start
-    
-    # Enhance image quality
-    from PIL import ImageEnhance
+    # Enhance sharpness
     enhancer = ImageEnhance.Sharpness(image)
-    image = enhancer.enhance(1.2)
+    image = enhancer.enhance(1.3)
     
     # Save
-    output = "output.png"
-    image.save(output, "PNG", quality=95)
+    filename = f"output_{index}.png"
+    image.save(filename, "PNG")
     
-    total = time.time() - start
-    print(f"✨ DONE! Generated in {gen_time:.1f}s")
-    print(f"⏱️  Total: {total:.1f}s")
-    print(f"📁 Saved: {output}")
+    gen_time = time.time() - gen_start
+    print(f"✅ Image {index} done in {gen_time:.1f}s")
     
-    return output
+    return gen_time
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--prompt", type=str, required=True)
-    parser.add_argument("--style", type=str, default="photorealistic")
-    parser.add_argument("--steps", type=int, default=1)
+    parser.add_argument("--count", type=int, default=1)
+    parser.add_argument("--steps", type=int, default=8)
+    parser.add_argument("--prompt1", type=str, default="")
+    parser.add_argument("--prompt2", type=str, default="")
+    parser.add_argument("--prompt3", type=str, default="")
+    parser.add_argument("--prompt4", type=str, default="")
+    parser.add_argument("--prompt5", type=str, default="")
+    
     args = parser.parse_args()
     
-    generate_image(args.prompt, args.style, args.steps)
+    # Collect prompts
+    prompts = []
+    for i in range(1, args.count + 1):
+        prompt = getattr(args, f"prompt{i}", "")
+        if prompt:
+            prompts.append(prompt)
+        else:
+            prompts.append(prompts[0] if prompts else "a boy jumping from airplane, photorealistic, cinematic")
+    
+    print("="*50)
+    print("🚀 FAST QUALITY IMAGE GENERATOR")
+    print(f"📸 Images: {len(prompts)}")
+    print(f"⚙️  Steps: {args.steps}")
+    print("="*50)
+    
+    # Load model - FAST 2GB model
+    model_id = "SG161222/Realistic_Vision_V5.1_noVAE"
+    
+    print("📥 Loading model (~2GB, first time only)...")
+    load_start = time.time()
+    
+    pipe = DiffusionPipeline.from_pretrained(
+        model_id,
+        torch_dtype=torch.float32,
+        safety_checker=None,
+        requires_safety_checker=False,
+    )
+    
+    # CPU optimizations
+    pipe.enable_attention_slicing()
+    
+    load_time = time.time() - load_start
+    print(f"✅ Model loaded in {load_time:.1f}s")
+    
+    # Generate all images
+    total_gen = 0
+    for i, prompt in enumerate(prompts, 1):
+        gen_time = generate_single_image(pipe, prompt, args.steps, i)
+        total_gen += gen_time
+    
+    # Save info
+    with open("info.txt", "w") as f:
+        f.write(f"Model: Realistic Vision V5.1\n")
+        f.write(f"Steps per image: {args.steps}\n")
+        f.write(f"Total images: {args.count}\n")
+        f.write(f"Model load: {load_time:.1f}s\n")
+        f.write(f"Total generation: {total_gen:.1f}s\n")
+        f.write("\nPrompts:\n")
+        for i, p in enumerate(prompts, 1):
+            f.write(f"{i}. {p}\n")
+    
+    print("\n" + "="*50)
+    print(f"🎉 ALL DONE!")
+    print(f"📸 Generated {args.count} image(s)")
+    print(f"⏱️  Total time: {load_time + total_gen:.1f}s")
+    print("="*50)
+
+if __name__ == "__main__":
+    main()
