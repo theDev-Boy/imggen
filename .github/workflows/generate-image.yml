@@ -4,51 +4,48 @@ on:
   workflow_dispatch:
     inputs:
       count:
-        description: '📸 How many images?'
+        description: 'How many images?'
         required: true
         default: '1'
         type: choice
         options: ['1', '2', '3', '4', '5']
       
       prompt1:
-        description: '📝 Prompt for Image 1'
+        description: 'Prompt for Image 1'
         required: true
         default: 'a boy jumping from airplane'
         type: string
       
       prompt2:
-        description: '📝 Prompt for Image 2'
+        description: 'Prompt for Image 2'
         required: false
         default: ''
         type: string
       
       prompt3:
-        description: '📝 Prompt for Image 3'
+        description: 'Prompt for Image 3'
         required: false
         default: ''
         type: string
       
       prompt4:
-        description: '📝 Prompt for Image 4'
+        description: 'Prompt for Image 4'
         required: false
         default: ''
         type: string
       
       prompt5:
-        description: '📝 Prompt for Image 5'
+        description: 'Prompt for Image 5'
         required: false
         default: ''
         type: string
       
       steps:
-        description: '⚡ Speed vs Quality'
+        description: 'Speed vs Quality'
         required: true
         default: 'fast'
         type: choice
-        options:
-          - 'fast'
-          - 'balanced'
-          - 'quality'
+        options: ['fast', 'balanced', 'quality']
 
 jobs:
   generate:
@@ -56,7 +53,7 @@ jobs:
     timeout-minutes: 30
     
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
       
       - name: Setup Python
@@ -64,13 +61,13 @@ jobs:
         with:
           python-version: '3.10'
       
-      - name: Cache
+      - name: Cache Dependencies
         uses: actions/cache@v4
         with:
           path: |
             ~/.cache/pip
             ~/.cache/huggingface
-          key: smart-gen-v1-${{ runner.os }}
+          key: smart-gen-v2-${{ runner.os }}
       
       - name: Install Dependencies
         run: |
@@ -81,15 +78,7 @@ jobs:
       - name: Generate Images
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-        run: |
-          python generate.py \
-            --count ${{ github.event.inputs.count }} \
-            --steps ${{ github.event.inputs.steps }} \
-            --p1 "${{ github.event.inputs.prompt1 }}" \
-            --p2 "${{ github.event.inputs.prompt2 }}" \
-            --p3 "${{ github.event.inputs.prompt3 }}" \
-            --p4 "${{ github.event.inputs.prompt4 }}" \
-            --p5 "${{ github.event.inputs.prompt5 }}"
+        run: python generate.py --count ${{ github.event.inputs.count }} --steps ${{ github.event.inputs.steps }} --p1 "${{ github.event.inputs.prompt1 }}" --p2 "${{ github.event.inputs.prompt2 }}" --p3 "${{ github.event.inputs.prompt3 }}" --p4 "${{ github.event.inputs.prompt4 }}" --p5 "${{ github.event.inputs.prompt5 }}"
       
       - name: Upload Images
         uses: actions/upload-artifact@v4
