@@ -1,7 +1,6 @@
 torch>=2.0.0
-diffusers>=0.28.0
-transformers>=4.40.0
-accelerate>=0.28.0
-safetensors
-pillow
-huggingface_hub
+diffusers>=0.25.0
+transformers>=4.36.0
+accelerate>=0.25.0
+safetensors>=0.4.0
+pillow>=10.0.0
