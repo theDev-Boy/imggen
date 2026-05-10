@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""
-FAST & DETAILED Image Generator
-Model: DreamShaper v8 + LCM (2GB, 4-6 steps, great scenes!)
-"""
-
 import torch
 import time
 import argparse
@@ -11,34 +6,25 @@ from diffusers import DiffusionPipeline, LCMScheduler
 from PIL import Image, ImageEnhance
 
 def generate_fast(pipe, prompt, steps, index):
-    """Generate with LCM - Ultra fast!"""
     print(f"\n🎨 Image {index}: {prompt[:60]}...")
-    
-    # Better prompt engineering for skydiving/airplane scenes
     enhanced = f"{prompt}, highly detailed, sharp focus, professional photography, 8k, masterpiece"
     negative = "blurry, ugly, deformed, bad anatomy, cartoon, painting, watermark, text, low quality"
-    
     start = time.time()
-    
     with torch.no_grad():
         image = pipe(
             prompt=enhanced,
             negative_prompt=negative,
             num_inference_steps=steps,
-            guidance_scale=1.5,  # LCM optimized
+            guidance_scale=1.5,
             height=512,
             width=512,
         ).images[0]
-    
-    # Enhance
     enhancer = ImageEnhance.Sharpness(image)
     image = enhancer.enhance(1.2)
     enhancer = ImageEnhance.Contrast(image)
     image = enhancer.enhance(1.1)
-    
     filename = f"output_{index}.png"
     image.save(filename, "PNG", optimize=True)
-    
     t = time.time() - start
     print(f"✅ Done in {t:.1f}s")
     return t
@@ -54,27 +40,18 @@ def main():
     parser.add_argument("--p5", type=str, default="")
     args = parser.parse_args()
     
-    # Parse steps
-    steps_map = {
-        "fast (4 steps, 30s)": 4,
-        "balanced (6 steps, 45s)": 6,
-        "quality (8 steps, 60s)": 8
-    }
+    steps_map = {"fast": 4, "balanced": 6, "quality": 8}
     steps = steps_map.get(args.steps, 4)
     
-    # Collect prompts
     prompts = [p for p in [args.p1, args.p2, args.p3, args.p4, args.p5][:args.count] if p]
     
     print("="*50)
     print("⚡ FAST IMAGE GENERATOR")
     print(f"📸 Images: {len(prompts)}")
     print(f"⚙️  Steps: {steps}")
-    print(f"🎯 Model: DreamShaper LCM")
     print("="*50)
     
-    # Load FAST model (DreamShaper with LCM)
     model_id = "SimianLuo/LCM_Dreamshaper_v7"
-    
     print("📥 Loading model...")
     t0 = time.time()
     
@@ -85,7 +62,6 @@ def main():
         requires_safety_checker=False,
     )
     
-    # LCM Scheduler for speed
     pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
     pipe.enable_attention_slicing()
     pipe.enable_vae_slicing()
@@ -93,7 +69,6 @@ def main():
     load_time = time.time() - t0
     print(f"✅ Loaded in {load_time:.1f}s\n")
     
-    # Generate all
     total_gen = 0
     for i, prompt in enumerate(prompts, 1):
         t = generate_fast(pipe, prompt, steps, i)
@@ -101,10 +76,8 @@ def main():
     
     total = load_time + total_gen
     print(f"\n{'='*50}")
-    print(f"🎉 COMPLETE!")
-    print(f"📸 {len(prompts)} image(s)")
-    print(f"⏱️  Total: {total:.1f}s ({total/60:.1f} min)")
-    print(f"⚡ Avg per image: {total_gen/len(prompts):.1f}s")
+    print(f"🎉 COMPLETE! {len(prompts)} image(s)")
+    print(f"⏱️  Total: {total:.1f}s")
     print(f"{'='*50}")
 
 if __name__ == "__main__":
