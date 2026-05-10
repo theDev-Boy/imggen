@@ -1,5 +1,4 @@
 name: 🎨 AI Image Generator
-run-name: ${{ github.event.inputs.count }} image(s)
 
 on:
   workflow_dispatch:
@@ -18,27 +17,27 @@ on:
         type: string
       
       prompt2:
-        description: '📝 Prompt for Image 2 (only if count ≥ 2)'
+        description: '📝 Prompt for Image 2'
         required: false
-        default: 'a boy jumping from airplane with parachute, dramatic sky, realistic'
+        default: ''
         type: string
       
       prompt3:
-        description: '📝 Prompt for Image 3 (only if count ≥ 3)'
+        description: '📝 Prompt for Image 3'
         required: false
-        default: 'a boy free falling from plane, clouds, adventure, photorealistic'
+        default: ''
         type: string
       
       prompt4:
-        description: '📝 Prompt for Image 4 (only if count ≥ 4)'
+        description: '📝 Prompt for Image 4'
         required: false
-        default: 'skydiver boy above mountains, cinematic lighting, 8k'
+        default: ''
         type: string
       
       prompt5:
-        description: '📝 Prompt for Image 5 (only if count ≥ 5)'
+        description: '📝 Prompt for Image 5'
         required: false
-        default: 'boy with parachute landing, sunset, beautiful scenery'
+        default: ''
         type: string
       
       steps:
@@ -47,9 +46,9 @@ on:
         default: 'fast'
         type: choice
         options:
-          - 'fast (4 steps, 30s)'
-          - 'balanced (6 steps, 45s)'
-          - 'quality (8 steps, 60s)'
+          - 'fast'
+          - 'balanced'
+          - 'quality'
 
 jobs:
   generate:
@@ -57,42 +56,35 @@ jobs:
     timeout-minutes: 20
     
     steps:
-      - name: 📥 Checkout
+      - name: Checkout
         uses: actions/checkout@v4
       
-      - name: 🐍 Setup Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
       
-      - name: 📦 Cache Everything
+      - name: Cache
         uses: actions/cache@v4
         with:
           path: |
             ~/.cache/pip
             ~/.cache/huggingface
-          key: fast-model-v1-${{ runner.os }}
+          key: fast-model-v2-${{ runner.os }}
       
-      - name: 📚 Install Dependencies
+      - name: Install Dependencies
         run: |
           pip install --upgrade pip setuptools wheel
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           pip install diffusers transformers accelerate safetensors pillow
       
-      - name: 🎯 Generate Images
+      - name: Generate Images
         env:
           HF_HUB_DISABLE_PROGRESS_BARS: 1
         run: |
-          python generate.py \
-            --count ${{ github.event.inputs.count }} \
-            --steps ${{ github.event.inputs.steps }} \
-            --p1 "${{ github.event.inputs.prompt1 }}" \
-            --p2 "${{ github.event.inputs.prompt2 }}" \
-            --p3 "${{ github.event.inputs.prompt3 }}" \
-            --p4 "${{ github.event.inputs.prompt4 }}" \
-            --p5 "${{ github.event.inputs.prompt5 }}"
+          python generate.py --count ${{ github.event.inputs.count }} --steps ${{ github.event.inputs.steps }} --p1 "${{ github.event.inputs.prompt1 }}" --p2 "${{ github.event.inputs.prompt2 }}" --p3 "${{ github.event.inputs.prompt3 }}" --p4 "${{ github.event.inputs.prompt4 }}" --p5 "${{ github.event.inputs.prompt5 }}"
       
-      - name: 📤 Upload Images
+      - name: Upload Images
         uses: actions/upload-artifact@v4
         with:
           name: ai-images
