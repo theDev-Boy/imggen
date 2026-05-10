@@ -1,37 +1,73 @@
-name: 🎨 Generate AI Image
-run-name: Generating - ${{ github.event.inputs.prompt }}
+name: 🎨 AI Image Generator
+run-name: ${{ github.event.inputs.image_count }} image(s) - ${{ github.event.inputs.prompt_1 }}
 
 on:
   workflow_dispatch:
     inputs:
-      prompt:
-        description: 'Describe your image'
+      image_count:
+        description: 'How many images? (1-10)'
         required: true
-        default: 'a boy jumping from airplane, cinematic, photorealistic, detailed face'
-        type: string
-      style:
-        description: 'Image style'
-        required: false
-        default: 'photorealistic'
-        type: choice
-        options:
-          - 'photorealistic'
-          - 'anime'
-          - 'artistic'
-      steps:
-        description: 'Quality (1=fastest, 4=best)'
-        required: false
         default: '1'
         type: choice
         options:
           - '1'
           - '2'
+          - '3'
           - '4'
+          - '5'
+          - '6'
+          - '7'
+          - '8'
+          - '9'
+          - '10'
+      
+      prompt_1:
+        description: 'Prompt for Image 1'
+        required: true
+        default: 'a boy jumping from airplane, photorealistic, detailed face, cinematic'
+        type: string
+      
+      prompt_2:
+        description: 'Prompt for Image 2 (if needed)'
+        required: false
+        default: ''
+        type: string
+      
+      prompt_3:
+        description: 'Prompt for Image 3 (if needed)'
+        required: false
+        default: ''
+        type: string
+      
+      prompt_4:
+        description: 'Prompt for Image 4 (if needed)'
+        required: false
+        default: ''
+        type: string
+      
+      prompt_5:
+        description: 'Prompt for Image 5 (if needed)'
+        required: false
+        default: ''
+        type: string
+      
+      steps:
+        description: 'Quality steps (8-12 best, 4-6 faster)'
+        required: false
+        default: '8'
+        type: choice
+        options:
+          - '4'
+          - '6'
+          - '8'
+          - '10'
+          - '12'
+          - '15'
 
 jobs:
-  generate-image:
+  generate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     
     steps:
       - name: 📥 Checkout
@@ -42,42 +78,35 @@ jobs:
         with:
           python-version: '3.10'
       
-      - name: 📦 Cache Python PIP
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: pip-v2-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
-          restore-keys: pip-v2-${{ runner.os }}-
-      
-      - name: 📦 Cache Models PERMANENTLY
-        uses: actions/cache@v4
-        id: model-cache
-        with:
-          path: |
-            ~/.cache/huggingface
-            /home/runner/.cache/huggingface
-          key: model-v5-${{ runner.os }}
-          restore-keys: model-v5-${{ runner.os }}
-      
       - name: 📚 Install Dependencies
         run: |
-          pip install --upgrade pip setuptools wheel
+          pip install --upgrade pip
           pip install torch --index-url https://download.pytorch.org/whl/cpu
-          pip install diffusers transformers accelerate safetensors pillow huggingface_hub
+          pip install diffusers transformers accelerate safetensors pillow
       
-      - name: 🎯 Generate Image
+      - name: 🎯 Generate Images
         env:
-          HF_HOME: /home/runner/.cache/huggingface
-          TRANSFORMERS_CACHE: /home/runner/.cache/huggingface
+          HF_HUB_DISABLE_PROGRESS_BARS: 1
         run: |
           python generate.py \
-            --prompt "${{ github.event.inputs.prompt }}" \
-            --style "${{ github.event.inputs.style }}" \
-            --steps ${{ github.event.inputs.steps }}
+            --count ${{ github.event.inputs.image_count }} \
+            --steps ${{ github.event.inputs.steps }} \
+            --prompt1 "${{ github.event.inputs.prompt_1 }}" \
+            --prompt2 "${{ github.event.inputs.prompt_2 }}" \
+            --prompt3 "${{ github.event.inputs.prompt_3 }}" \
+            --prompt4 "${{ github.event.inputs.prompt_4 }}" \
+            --prompt5 "${{ github.event.inputs.prompt_5 }}"
       
-      - name: 📤 Upload Image
+      - name: 📤 Upload All Images
         uses: actions/upload-artifact@v4
         with:
-          name: generated-image
-          path: output.png
+          name: generated-images
+          path: |
+            output_*.png
+            info.txt
           retention-days: 7
+      
+      - name: 🎉 Done!
+        run: |
+          echo "✅ Generated ${{ github.event.inputs.image_count }} image(s)!"
+          ls -lh output_*.png
