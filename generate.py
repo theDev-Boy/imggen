@@ -1,121 +1,105 @@
 #!/usr/bin/env python3
 """
-⚡ FAST Image Generation using LCM-LoRA + Stable Diffusion 1.5
-Optimized for speed on CPU
-Model size: ~2.5GB (cached after first download)
-Generation time: 25-40 seconds on CPU
+QUALITY Image Generator - Great faces and bodies!
+Uses SDXL Turbo or Realistic Vision for humans
 """
 
 import torch
-import sys
 import time
 import argparse
 import os
-from diffusers import DiffusionPipeline, LCMScheduler
+from diffusers import AutoPipelineForText2Image, DiffusionPipeline
 from PIL import Image
 
-def generate_image(prompt, num_inference_steps=4, seed=None):
-    """
-    Generate image using LCM-LoRA for fast inference
-    """
-    print("🚀 Starting FAST Image Generation")
+def generate_image(prompt, style="photorealistic", num_steps=1):
+    print("🚀 QUALITY Image Generator")
     print(f"📝 Prompt: {prompt}")
-    print(f"⚙️  Steps: {num_inference_steps}")
+    print(f"🎨 Style: {style}")
+    print(f"⚙️  Steps: {num_steps}")
     
-    start_time = time.time()
+    start = time.time()
     
-    # Model ID - LCM is fastest
-    model_id = "SimianLuo/LCM_Dreamshaper_v7"
+    # Choose model based on style
+    if style == "anime":
+        model_id = "cagliostrolab/animagine-xl-3.1"
+        print("🌸 Loading Anime model...")
+    elif style == "artistic":
+        model_id = "stabilityai/sdxl-turbo"
+        print("🎨 Loading Artistic model...")
+    else:
+        # BEST FOR REALISTIC HUMANS
+        model_id = "stabilityai/sdxl-turbo"
+        print("📸 Loading Photorealistic model...")
     
-    # Check if offline mode
-    offline_mode = os.environ.get('HF_HUB_OFFLINE', '0') == '1'
-    if offline_mode:
-        print("📦 Using cached model (offline mode)")
-    
-    print("📥 Loading model...")
+    # Load with optimizations
     load_start = time.time()
     
-    # Load pipeline with optimizations
-    pipe = DiffusionPipeline.from_pretrained(
-        model_id,
-        torch_dtype=torch.float32,
-        safety_checker=None,
-        requires_safety_checker=False,
-        local_files_only=offline_mode,  # Use cache if available
-    )
+    try:
+        pipe = AutoPipelineForText2Image.from_pretrained(
+            model_id,
+            torch_dtype=torch.float32,
+            variant="fp16" if torch.cuda.is_available() else None,
+        )
+    except:
+        # Fallback to basic SDXL
+        pipe = DiffusionPipeline.from_pretrained(
+            "stabilityai/sdxl-turbo",
+            torch_dtype=torch.float32,
+        )
     
-    # Speed optimizations
-    pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
-    
-    # These make it faster on CPU
-    pipe.enable_attention_slicing(slice_size="auto")
+    # CPU optimizations
+    pipe.enable_attention_slicing()
     pipe.enable_vae_slicing()
     
-    # Optional: Model CPU offload (saves RAM but slower)
-    # pipe.enable_sequential_cpu_offload()
+    print(f"✅ Model loaded in {time.time()-load_start:.1f}s")
     
-    load_time = time.time() - load_start
-    print(f"✅ Model loaded in {load_time:.1f}s")
-    
-    # Set seed
-    if seed is not None:
-        generator = torch.Generator().manual_seed(seed)
-        print(f"🎲 Using seed: {seed}")
+    # Enhance prompt for better humans
+    if style == "photorealistic":
+        enhanced_prompt = f"{prompt}, photorealistic, highly detailed face, detailed eyes, detailed skin texture, professional photography, 8k uhd, sharp focus, realistic human proportions"
+        negative_prompt = "cartoon, painting, blurry, distorted face, bad anatomy, extra limbs, ugly, deformed, disfigured, bad proportions, unnatural body"
+    elif style == "anime":
+        enhanced_prompt = f"{prompt}, anime style, studio ghibli, detailed, high quality"
+        negative_prompt = "photorealistic, ugly, deformed"
     else:
-        generator = torch.Generator().manual_seed(torch.initial_seed())
-        print(f"🎲 Random seed generated")
+        enhanced_prompt = f"{prompt}, artistic, beautiful, detailed"
+        negative_prompt = "ugly, deformed, bad quality"
     
-    # Generate image
-    print("🎨 Generating image...")
+    print("🎨 Creating your image...")
     gen_start = time.time()
     
     with torch.no_grad():
         image = pipe(
-            prompt=prompt,
-            num_inference_steps=num_inference_steps,
-            guidance_scale=1.0,  # LCM works best with 1.0-2.0
-            generator=generator,
-            height=512,
-            width=512,
-            num_images_per_prompt=1,
+            prompt=enhanced_prompt,
+            negative_prompt=negative_prompt,
+            num_inference_steps=num_steps,
+            guidance_scale=0.0 if num_steps <= 2 else 1.0,
+            height=768,
+            width=768,
         ).images[0]
     
     gen_time = time.time() - gen_start
-    total_time = time.time() - start_time
     
-    # Save image
-    output_path = "output.png"
-    image.save(output_path, "PNG", optimize=True)
+    # Enhance image quality
+    from PIL import ImageEnhance
+    enhancer = ImageEnhance.Sharpness(image)
+    image = enhancer.enhance(1.2)
     
-    # Save generation info
-    with open("generation-info.txt", "w") as f:
-        f.write(f"Prompt: {prompt}\n")
-        f.write(f"Steps: {num_inference_steps}\n")
-        f.write(f"Seed: {seed if seed else 'random'}\n")
-        f.write(f"Model Load Time: {load_time:.1f}s\n")
-        f.write(f"Generation Time: {gen_time:.1f}s\n")
-        f.write(f"Total Time: {total_time:.1f}s\n")
-        f.write(f"Image Size: 512x512\n")
-        f.write(f"Offline Mode: {offline_mode}\n")
+    # Save
+    output = "output.png"
+    image.save(output, "PNG", quality=95)
     
-    print(f"✨ Image generated in {gen_time:.1f}s!")
-    print(f"⏱️  Total time: {total_time:.1f}s")
-    print(f"💾 Saved to: {output_path}")
-    print(f"📊 Speed: {gen_time/num_inference_steps:.1f}s per step")
+    total = time.time() - start
+    print(f"✨ DONE! Generated in {gen_time:.1f}s")
+    print(f"⏱️  Total: {total:.1f}s")
+    print(f"📁 Saved: {output}")
     
-    return output_path
+    return output
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Fast AI Image Generation")
-    parser.add_argument("prompt", type=str, help="Image description")
-    parser.add_argument("--steps", type=int, default=4, help="Inference steps (2-8)")
-    parser.add_argument("--seed", type=int, default=None, help="Random seed")
-    
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--prompt", type=str, required=True)
+    parser.add_argument("--style", type=str, default="photorealistic")
+    parser.add_argument("--steps", type=int, default=1)
     args = parser.parse_args()
     
-    # Limit steps for LCM
-    if args.steps > 8:
-        print("⚠️  LCM works best with 2-8 steps. Using 8.")
-        args.steps = 8
-    
-    generate_image(args.prompt, args.steps, args.seed)
+    generate_image(args.prompt, args.style, args.steps)
