@@ -1,80 +1,82 @@
 #!/usr/bin/env python3
 """
-FAST & QUALITY Image Generator
-Model: Realistic Vision v5.1 (2GB) - Great faces, fast!
+FAST & DETAILED Image Generator
+Model: DreamShaper v8 + LCM (2GB, 4-6 steps, great scenes!)
 """
 
 import torch
 import time
 import argparse
-from diffusers import DiffusionPipeline
+from diffusers import DiffusionPipeline, LCMScheduler
 from PIL import Image, ImageEnhance
 
-def generate_single_image(pipe, prompt, steps=8, index=1):
-    """Generate one high-quality image"""
-    print(f"\n🎨 Image {index}: {prompt}")
+def generate_fast(pipe, prompt, steps, index):
+    """Generate with LCM - Ultra fast!"""
+    print(f"\n🎨 Image {index}: {prompt[:60]}...")
     
-    # Enhance prompt for better humans
-    enhanced = f"{prompt}, photorealistic, highly detailed face, detailed skin, professional photography, 8k, sharp focus, masterpiece"
-    negative = "cartoon, painting, blurry, distorted face, bad anatomy, extra limbs, ugly, deformed, disfigured, bad hands, missing fingers, watermark, text"
+    # Better prompt engineering for skydiving/airplane scenes
+    enhanced = f"{prompt}, highly detailed, sharp focus, professional photography, 8k, masterpiece"
+    negative = "blurry, ugly, deformed, bad anatomy, cartoon, painting, watermark, text, low quality"
     
-    gen_start = time.time()
+    start = time.time()
     
     with torch.no_grad():
         image = pipe(
             prompt=enhanced,
             negative_prompt=negative,
             num_inference_steps=steps,
-            guidance_scale=7.5,
+            guidance_scale=1.5,  # LCM optimized
             height=512,
             width=512,
         ).images[0]
     
-    # Enhance sharpness
+    # Enhance
     enhancer = ImageEnhance.Sharpness(image)
-    image = enhancer.enhance(1.3)
+    image = enhancer.enhance(1.2)
+    enhancer = ImageEnhance.Contrast(image)
+    image = enhancer.enhance(1.1)
     
-    # Save
     filename = f"output_{index}.png"
-    image.save(filename, "PNG")
+    image.save(filename, "PNG", optimize=True)
     
-    gen_time = time.time() - gen_start
-    print(f"✅ Image {index} done in {gen_time:.1f}s")
-    
-    return gen_time
+    t = time.time() - start
+    print(f"✅ Done in {t:.1f}s")
+    return t
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--count", type=int, default=1)
-    parser.add_argument("--steps", type=int, default=8)
-    parser.add_argument("--prompt1", type=str, default="")
-    parser.add_argument("--prompt2", type=str, default="")
-    parser.add_argument("--prompt3", type=str, default="")
-    parser.add_argument("--prompt4", type=str, default="")
-    parser.add_argument("--prompt5", type=str, default="")
-    
+    parser.add_argument("--steps", type=str, default="fast")
+    parser.add_argument("--p1", type=str, default="")
+    parser.add_argument("--p2", type=str, default="")
+    parser.add_argument("--p3", type=str, default="")
+    parser.add_argument("--p4", type=str, default="")
+    parser.add_argument("--p5", type=str, default="")
     args = parser.parse_args()
     
+    # Parse steps
+    steps_map = {
+        "fast (4 steps, 30s)": 4,
+        "balanced (6 steps, 45s)": 6,
+        "quality (8 steps, 60s)": 8
+    }
+    steps = steps_map.get(args.steps, 4)
+    
     # Collect prompts
-    prompts = []
-    for i in range(1, args.count + 1):
-        prompt = getattr(args, f"prompt{i}", "")
-        if prompt:
-            prompts.append(prompt)
-        else:
-            prompts.append(prompts[0] if prompts else "a boy jumping from airplane, photorealistic, cinematic")
+    prompts = [p for p in [args.p1, args.p2, args.p3, args.p4, args.p5][:args.count] if p]
     
     print("="*50)
-    print("🚀 FAST QUALITY IMAGE GENERATOR")
+    print("⚡ FAST IMAGE GENERATOR")
     print(f"📸 Images: {len(prompts)}")
-    print(f"⚙️  Steps: {args.steps}")
+    print(f"⚙️  Steps: {steps}")
+    print(f"🎯 Model: DreamShaper LCM")
     print("="*50)
     
-    # Load model - FAST 2GB model
-    model_id = "SG161222/Realistic_Vision_V5.1_noVAE"
+    # Load FAST model (DreamShaper with LCM)
+    model_id = "SimianLuo/LCM_Dreamshaper_v7"
     
-    print("📥 Loading model (~2GB, first time only)...")
-    load_start = time.time()
+    print("📥 Loading model...")
+    t0 = time.time()
     
     pipe = DiffusionPipeline.from_pretrained(
         model_id,
@@ -83,34 +85,27 @@ def main():
         requires_safety_checker=False,
     )
     
-    # CPU optimizations
+    # LCM Scheduler for speed
+    pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
     pipe.enable_attention_slicing()
+    pipe.enable_vae_slicing()
     
-    load_time = time.time() - load_start
-    print(f"✅ Model loaded in {load_time:.1f}s")
+    load_time = time.time() - t0
+    print(f"✅ Loaded in {load_time:.1f}s\n")
     
-    # Generate all images
+    # Generate all
     total_gen = 0
     for i, prompt in enumerate(prompts, 1):
-        gen_time = generate_single_image(pipe, prompt, args.steps, i)
-        total_gen += gen_time
+        t = generate_fast(pipe, prompt, steps, i)
+        total_gen += t
     
-    # Save info
-    with open("info.txt", "w") as f:
-        f.write(f"Model: Realistic Vision V5.1\n")
-        f.write(f"Steps per image: {args.steps}\n")
-        f.write(f"Total images: {args.count}\n")
-        f.write(f"Model load: {load_time:.1f}s\n")
-        f.write(f"Total generation: {total_gen:.1f}s\n")
-        f.write("\nPrompts:\n")
-        for i, p in enumerate(prompts, 1):
-            f.write(f"{i}. {p}\n")
-    
-    print("\n" + "="*50)
-    print(f"🎉 ALL DONE!")
-    print(f"📸 Generated {args.count} image(s)")
-    print(f"⏱️  Total time: {load_time + total_gen:.1f}s")
-    print("="*50)
+    total = load_time + total_gen
+    print(f"\n{'='*50}")
+    print(f"🎉 COMPLETE!")
+    print(f"📸 {len(prompts)} image(s)")
+    print(f"⏱️  Total: {total:.1f}s ({total/60:.1f} min)")
+    print(f"⚡ Avg per image: {total_gen/len(prompts):.1f}s")
+    print(f"{'='*50}")
 
 if __name__ == "__main__":
     main()
