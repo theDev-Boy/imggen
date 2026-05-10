@@ -27,7 +27,7 @@ on:
 jobs:
   generate-image:
     runs-on: ubuntu-latest
-    timeout-minutes: 20  # Should complete within 20 mins
+    timeout-minutes: 20
     
     steps:
       - name: 📥 Checkout Repository
@@ -43,7 +43,7 @@ jobs:
         id: cache-models
         with:
           path: ~/.cache/huggingface
-          key: lcm-sd15-model-v2
+          key: lcm-sd15-model-v3
           restore-keys: |
             lcm-sd15-model-
       
@@ -51,10 +51,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-          pip install diffusers==0.25.0 transformers accelerate safetensors pillow
+          pip install --upgrade huggingface_hub
+          pip install diffusers transformers accelerate safetensors pillow
       
       - name: 🎯 Generate Image
-        id: generate
         env:
           HF_HUB_DISABLE_PROGRESS_BARS: 1
           HF_HUB_ENABLE_HF_TRANSFER: 0
