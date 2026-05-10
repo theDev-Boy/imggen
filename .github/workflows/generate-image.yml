@@ -1,28 +1,32 @@
 name: 🎨 Generate AI Image
-run-name: Generating image - ${{ github.event.inputs.prompt }}
+run-name: Generating - ${{ github.event.inputs.prompt }}
 
 on:
   workflow_dispatch:
     inputs:
       prompt:
-        description: 'What image do you want?'
+        description: 'Describe your image'
         required: true
-        default: 'boy jumping from airplane, cinematic lighting, dramatic sky'
+        default: 'a boy jumping from airplane, cinematic, photorealistic, detailed face'
         type: string
-      steps:
-        description: 'Number of inference steps (4-8 for LCM)'
+      style:
+        description: 'Image style'
         required: false
-        default: '4'
+        default: 'photorealistic'
         type: choice
         options:
-          - '4'
-          - '6'
-          - '8'
-      seed:
-        description: 'Random seed (leave empty for random)'
+          - 'photorealistic'
+          - 'anime'
+          - 'artistic'
+      steps:
+        description: 'Quality (1=fastest, 4=best)'
         required: false
-        default: ''
-        type: string
+        default: '1'
+        type: choice
+        options:
+          - '1'
+          - '2'
+          - '4'
 
 jobs:
   generate-image:
@@ -30,7 +34,7 @@ jobs:
     timeout-minutes: 15
     
     steps:
-      - name: 📥 Checkout Repository
+      - name: 📥 Checkout
         uses: actions/checkout@v4
       
       - name: 🐍 Setup Python
@@ -38,53 +42,42 @@ jobs:
         with:
           python-version: '3.10'
       
-      - name: 📦 Cache Python Packages
+      - name: 📦 Cache Python PIP
         uses: actions/cache@v4
-        id: cache-pip
         with:
           path: ~/.cache/pip
-          key: pip-packages-v1-${{ runner.os }}-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            pip-packages-v1-${{ runner.os }}-
+          key: pip-v2-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+          restore-keys: pip-v2-${{ runner.os }}-
       
-      - name: 📦 Cache HuggingFace Models
+      - name: 📦 Cache Models PERMANENTLY
         uses: actions/cache@v4
-        id: cache-hf
+        id: model-cache
         with:
-          path: ~/.cache/huggingface
-          key: hf-models-v1-${{ hashFiles('**/generate.py') }}
-          restore-keys: |
-            hf-models-v1-
+          path: |
+            ~/.cache/huggingface
+            /home/runner/.cache/huggingface
+          key: model-v5-${{ runner.os }}
+          restore-keys: model-v5-${{ runner.os }}
       
       - name: 📚 Install Dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-          pip install --upgrade huggingface_hub
-          pip install diffusers transformers accelerate safetensors pillow
+          pip install --upgrade pip setuptools wheel
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install diffusers transformers accelerate safetensors pillow huggingface_hub
       
       - name: 🎯 Generate Image
         env:
-          HF_HUB_DISABLE_PROGRESS_BARS: 1
-          HF_HUB_ENABLE_HF_TRANSFER: 0
-          HF_HUB_OFFLINE: ${{ steps.cache-hf.outputs.cache-hit == 'true' && '1' || '0' }}
+          HF_HOME: /home/runner/.cache/huggingface
+          TRANSFORMERS_CACHE: /home/runner/.cache/huggingface
         run: |
-          python generate.py "${{ github.event.inputs.prompt }}" \
-            --steps ${{ github.event.inputs.steps }} \
-            ${{ github.event.inputs.seed != '' && format('--seed {0}', github.event.inputs.seed) || '' }}
+          python generate.py \
+            --prompt "${{ github.event.inputs.prompt }}" \
+            --style "${{ github.event.inputs.style }}" \
+            --steps ${{ github.event.inputs.steps }}
       
-      - name: 📤 Upload Generated Image
+      - name: 📤 Upload Image
         uses: actions/upload-artifact@v4
         with:
           name: generated-image
-          path: |
-            output.png
-            generation-info.txt
+          path: output.png
           retention-days: 7
-      
-      - name: 🎉 Show Image Info
-        run: |
-          echo "✅ Image generated successfully!"
-          echo "📝 Prompt: ${{ github.event.inputs.prompt }}"
-          echo "⏱️ Check 'generation-info.txt' for timing details"
-          ls -lh output.png
